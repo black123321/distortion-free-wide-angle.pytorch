@@ -1,4 +1,7 @@
 import os, sys
+
+from matplotlib import pyplot as plt
+
 sys.path.insert(0, os.getcwd())
 import numpy as np
 import cv2
@@ -7,20 +10,22 @@ from torch import optim
 from src.data import ImageDataset
 from src.energy import Energy
 from src.visualization import get_overlay_flow
+# import warnings
+# warnings.filterwarnings("ignore", category=UserWarning, message=".*torch.meshgrid.*")
 
 
 parser = argparse.ArgumentParser(description='Distortion-Free-Wide-Angle-Portraits-on-Camera-Phones')
 parser.add_argument('--file', type=str, required=True)
 
-parser.add_argument('--num_iter', type=int, default=200, help="number of optimization steps")
+parser.add_argument('--num_iter', type=int, default=200, help="number of optimization steps") # 1k-200; 4k-300
 parser.add_argument('--lr', type=float, default=0.5, help="learning rate")
-parser.add_argument('--Q', type=int, default=4, help="number of padding vertices")
-parser.add_argument('--mesh_ds_ratio', type=int, default=40, help="the pixel-to-vertex ratio")
+parser.add_argument('--Q', type=int, default=20, help="number of padding vertices") # 20
+parser.add_argument('--mesh_ds_ratio', type=int, default=24, help="the pixel-to-vertex ratio") # 1k-24; 4k-46
 
 parser.add_argument('--naive', type=int, default=0, help="if set True, perform naive orthographic correction")
 parser.add_argument('--face_energy', type=float, default=4, help="weight of the face energy term")
 parser.add_argument('--similarity', type=int, default=1, help="weight of similarity tranformation constraint")
-parser.add_argument('--line_bending', type=float, default=4, help="weight of the line bending term")
+parser.add_argument('--line_bending', type=float, default=400, help="weight of the line bending term")
 parser.add_argument('--regularization', type=float, default=0.5, help="weight of the regularization term")
 parser.add_argument('--boundary_constraint', type=float, default=4, help="weight of the mesh boundary constraint")
 
@@ -37,7 +42,7 @@ if __name__ == '__main__':
     _, filename = os.path.split(args.file)
     filename, _ = os.path.splitext(filename)
     image, mesh_uniform_padded, mesh_stereo_padded, correction_strength, seg_mask_padded, box_masks_padded = dataset.get_image_by_file(
-        args.file)
+        args.file, classes=[0])
 
     out_dir = "results/{}".format(
         filename)
@@ -62,7 +67,7 @@ if __name__ == '__main__':
             "regularization": args.regularization,
             "boundary_constraint": args.boundary_constraint
         }
-
+    print(box_masks_padded.shape)
     # load the optimization model
     print("loading the optimization model")
     model = Energy(options, mesh_uniform_padded, mesh_stereo_padded, correction_strength, box_masks_padded,
@@ -86,7 +91,6 @@ if __name__ == '__main__':
     mesh_optimal = model.mesh.detach().cpu().numpy()
     # mesh_optimal = mesh_target
     mesh_optimal = mesh_optimal[:, args.Q:-args.Q, args.Q:-args.Q].transpose([1, 2, 0])
-
     flow = mesh_uniform - mesh_optimal
 
     # warp the input image with the optical flow
@@ -94,6 +98,7 @@ if __name__ == '__main__':
     map_optimal = cv2.resize(mesh_optimal, (W, H))
     x, y = map_optimal[:, :, 0] + W // 2, map_optimal[:, :, 1] + H // 2
     out = cv2.remap(image, x, y, interpolation=cv2.INTER_LINEAR)
+    # out = cv2.remap(image, x, y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT101)
 
     # output
     cv2.imwrite(os.path.join(out_dir, "{}_input.jpg".format(filename)), image)

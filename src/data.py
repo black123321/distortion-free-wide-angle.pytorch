@@ -19,10 +19,12 @@ class ImageDataset(Dataset):
         self.data_list = sorted(self.data_list)
 
 
-    def get_image_by_file(self, file, classes=None):
-
+    def get_image_by_file(self, file, classes=None, predictor=None):
         data_name = file
-        fov = int(data_name.split('/')[-1].split('.')[0].split('_')[-1])
+        try:
+            fov = int(data_name.split('/')[-1].split('.')[0].split('_')[-1])
+        except ValueError:
+            fov = 120
 
         image = cv2.imread(data_name)
         H, W, _ = image.shape
@@ -31,18 +33,17 @@ class ImageDataset(Dataset):
         Wm = W // self.mesh_ds_ratio
 
         if classes is None:
-            seg_mask, box_masks = get_face_masks(image)
+            seg_mask, box_masks = get_face_masks(image, predictor=predictor)
         else:
-            seg_mask, box_masks = get_object_masks(image, classes=classes)
+            seg_mask, box_masks = get_object_masks(image, classes=classes, predictor=predictor)
 
         seg_mask = cv2.resize(seg_mask.astype(np.float32), (Wm, Hm))
         box_masks = [cv2.resize(box_mask.astype(np.float32), (Wm, Hm)) for box_mask in box_masks]
+        # print(box_masks)
         box_masks = np.stack(box_masks, axis=0)
         seg_mask_padded = np.pad(seg_mask, [[self.Q, self.Q], [self.Q, self.Q]], "constant")
         box_masks_padded = np.pad(box_masks, [[0, 0], [self.Q, self.Q], [self.Q, self.Q]], "constant")
-
         mesh_uniform_padded, mesh_stereo_padded = get_uniform_stereo_mesh(image, fov * np.pi / 180, self.Q, self.mesh_ds_ratio)
-
         radial_distance_padded = np.linalg.norm(mesh_uniform_padded, axis=0)
         half_diagonal = np.linalg.norm([H + 2 * self.Q * self.mesh_ds_ratio, W + 2 * self.Q * self.mesh_ds_ratio]) / 2.
         ra = half_diagonal / 2.

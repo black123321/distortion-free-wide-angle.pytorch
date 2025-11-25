@@ -1,7 +1,7 @@
 import cv2
 import torch, torchvision
 
-import dlib
+# import dlib
 
 # Some basic setup:
 # Setup detectron2 logger
@@ -40,8 +40,8 @@ def get_detectron_masks(image, predictor, classes=None, expansion=(1., 1.), debu
         seg_masks = seg_masks[indices]
 
     ew, eh = expansion
-    boxes = np.round(boxes).astype(np.int)
-    box_masks = np.zeros([len(instances), H, W], dtype=np.bool)
+    boxes = np.round(boxes).astype(int)
+    box_masks = np.ones([len(instances), H, W], dtype=bool)
 
     for i in range(len(instances)):
 
@@ -59,7 +59,7 @@ def get_detectron_masks(image, predictor, classes=None, expansion=(1., 1.), debu
         y1 = max(0, y1 - dh)
         y2 = min(W - 1, y2 + dh)
 
-        box_masks[i, y1:y2, x1:x2] = True
+        box_masks[i, y1:y2, x1:x2] = False
 
     if debug:
         v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
@@ -77,11 +77,11 @@ def get_dlib_masks(image, detector, expansion=(2, 1.5)):
 
     # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     rects = detector(image, 0)
-    mask = np.zeros([len(rects), H, W], dtype=np.bool)
+    mask = np.zeros([len(rects), H, W], dtype=bool)
 
     for i, rect in enumerate(rects):
-
-        rect = rect.rect
+        if hasattr(rect, "rect"):
+            rect = rect.rect
         width = rect.right() - rect.left()
         height = rect.bottom() - rect.top()
         dw = int(round((ew - 1.) * width / 2.))
@@ -108,40 +108,64 @@ def get_overlay_mask(image, mask, weight=0.3):
 
 def get_face_masks(image,
                    cfg_name="COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml",
-                   dat_path="data/mmod_human_face_detector.dat"):
+                   dat_path="data/mmod_human_face_detector.dat",
+                   predictor=None):
+    if predictor is None:
+        cfg = get_cfg()
+        # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+        cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
+        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+        # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_name)
+        predictor = DefaultPredictor(cfg)
 
-    cfg = get_cfg()
-    # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
-    cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
-    # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_name)
-    predictor = DefaultPredictor(cfg)
+    # dlib_detector = dlib.get_frontal_face_detector()  # 效果最好且快
+    # dlib_detector = dlib.cnn_face_detection_model_v1(dat_path)  # 效果好但是超级慢 （阻塞后在C++层面在跑）
+    box_masks, seg_masks = get_detectron_masks(image, predictor)  # 效果一般会有裂口 但是快
 
-    # dlib_detector = dlib.get_frontal_face_detector()
-    dlib_detector = dlib.cnn_face_detection_model_v1(dat_path)
-
-    _, seg_masks = get_detectron_masks(image, predictor)
     seg_mask = seg_masks.sum(axis=0) > 0
-    box_masks = get_dlib_masks(image, dlib_detector)
+    # box_masks = get_dlib_masks(image, dlib_detector)
 
     return seg_mask, box_masks
 
 
 def get_object_masks(image, classes,
                    cfg_name="COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml",
-                   dat_path="data/mmod_human_face_detector.dat"):
+                   dat_path="data/mmod_human_face_detector.dat",
+                   predictor=None):
+    if predictor is None:
+        cfg = get_cfg()
+        # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+        cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
+        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+        # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_name)
+        predictor = DefaultPredictor(cfg)
 
-    cfg = get_cfg()
-    # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
-    cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
-    # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_name)
-    predictor = DefaultPredictor(cfg)
+    h, w = image.shape[:2]
 
-    box_masks, seg_masks = get_detectron_masks(image, predictor, classes)
-    seg_mask = seg_masks.sum(axis=0) > 0
+    # box_masks, seg_masks = get_detectron_masks(image, predictor, classes)
+    # seg_mask = seg_masks.sum(axis=0) > 0
+    # seg_mask = ((seg_mask - 1) * -1).astype(bool)
+
+    seg_mask = np.ones((h, w), dtype=bool)
+
+    # sw = int(w / 3)
+    # ew = int(w / 3 * 2)
+    # seg_mask[:,sw:ew] = False
+
+    box_masks = np.expand_dims(seg_mask, axis=0)
+
+    # plt.figure(figsize=(20, 10))
+    # plt.subplot(1, 2, 1)
+    # plt.imshow(seg_mask)
+    # plt.colorbar()
+    # plt.subplot(1, 2, 2)
+    # plt.imshow(box_masks[0])
+    # plt.colorbar()
+    # plt.show()
+
+    # box_masks = np.expand_dims(box_masks[0], axis=0)
 
     return seg_mask, box_masks
 
@@ -165,10 +189,10 @@ if __name__ == "__main__":
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(cfg_name)
     detectron = DefaultPredictor(cfg)
 
-    dlib_detector = dlib.cnn_face_detection_model_v1("data/mmod_human_face_detector.dat")
+    # dlib_detector = dlib.cnn_face_detection_model_v1("data/mmod_human_face_detector.dat")
 
     box_masks, seg_masks = get_detectron_masks(image, detectron, classes=[0, 1, 2, 3, 16])
-    box_masks = get_dlib_masks(image, dlib_detector)
+    # box_masks = get_dlib_masks(image, dlib_detector)
     box_mask = box_masks.sum(axis=0) > 0
     seg_mask = seg_masks.sum(axis=0) > 0
     # joint_mask = np.logical_and(box_masks, seg_masks).sum(axis=0) > 0

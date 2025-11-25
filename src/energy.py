@@ -63,6 +63,7 @@ class Energy(nn.Module):
             target_mesh = self.target_mesh
 
         masks = self.box_masks.view(self.K, 1, self.Hm, self.Wm) * self.face_mask.view(1, 1, self.Hm, self.Wm)
+        # masks = self.face_mask.view(1, 1, self.Hm, self.Wm)
         face_energy = masks * self.correction_strength * (self.mesh - target_mesh) ** 2
         similarity_regularizer = (self.similarity[:, 0] - 1.) ** 2
         face_energy = face_energy.mean()
@@ -123,7 +124,7 @@ def _unit_test():
 
     x = torch.arange(Wm + 2 * Q) - (Wm / 2 + Q)
     y = torch.arange(Hm + 2 * Q) - (Hm / 2 + Q)
-    y, x = torch.meshgrid(y, x)
+    y, x = torch.meshgrid(y, x, indexing="xy")
     uniform_mesh = torch.stack([x, y], dim=0)
     target_mesh = uniform_mesh * 1.1
 
@@ -152,7 +153,7 @@ def _unit_test():
     h, w, _ = diff.shape
     X = np.arange(0, w, 1).astype(np.float32)
     Y = np.arange(0, h, 1).astype(np.float32)
-    X, Y = np.meshgrid(X, Y)
+    X, Y = np.meshgrid(X, Y, indexing="xy")
     plt.quiver(X, Y, diff[:, :, 0], diff[:, :, 1])
     plt.show()
 

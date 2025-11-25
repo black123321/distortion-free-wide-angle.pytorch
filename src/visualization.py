@@ -27,9 +27,11 @@ def get_overlay_flow(image, flow, color="aquamarine", ratio=0.7):
     fig.add_axes(ax)
 
     ax.imshow((image * ratio).astype(np.uint8))
-    X = np.arange(0.5, Wm, 1).astype(np.float32) * (H / Hm)
-    Y = np.arange(0.5, Hm, 1).astype(np.float32) * (W / Wm)
-    X, Y = np.meshgrid(X, Y)
+    # X = np.arange(0.5, Wm, 1).astype(np.float32) * (H / Hm)
+    # Y = np.arange(0.5, Hm, 1).astype(np.float32) * (W / Wm)
+    X = np.arange(0.5, Wm, 1).astype(np.float32) * (W / Wm)
+    Y = np.arange(0.5, Hm, 1).astype(np.float32) * (H / Hm)
+    X, Y = np.meshgrid(X, Y, indexing="xy")
     q = ax.quiver(X, Y, flow[:, :, 0], -flow[:, :, 1], color=color, scale=1.0, scale_units='xy')
 
     # plt.show()

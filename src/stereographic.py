@@ -18,7 +18,7 @@ def correct(image, fov):
 
     x = (np.arange(0, w, 1) - w / 2).astype(np.float32)
     y = (np.arange(0, h, 1) - h / 2).astype(np.float32)
-    x, y = np.meshgrid(x, y)
+    x, y = np.meshgrid(x, y, indexing="xy")
 
     coords = np.stack([x, y], axis=-1)
     rp = np.linalg.norm(coords, axis=-1)
@@ -45,7 +45,7 @@ def get_uniform_stereo_mesh(image, fov, Q, mesh_ds_ratio):
     y = (np.arange(0, Hm, 1)).astype(np.float32) - (Hm // 2) + 0.5
     x = x * mesh_ds_ratio
     y = y * mesh_ds_ratio
-    x, y = np.meshgrid(x, y)
+    x, y = np.meshgrid(x, y, indexing="xy")
 
     mesh_uniform = np.stack([x, y], axis=0)
     rp = np.linalg.norm(mesh_uniform, axis=0)
