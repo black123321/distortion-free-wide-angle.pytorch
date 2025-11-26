@@ -243,6 +243,7 @@ def main_image(args):
     print("results saved in {}".format(out_dir))
 
 if __name__ == "__main__":
+    
     parser = argparse.ArgumentParser()
     # 原有参数
     parser = argparse.ArgumentParser(description='Distortion-Free-Wide-Angle-Portraits-on-Camera-Phones')
