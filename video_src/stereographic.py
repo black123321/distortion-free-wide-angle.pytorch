@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.visualization import get_overlay_flow
+from video_src.visualization import get_overlay_flow
 
 eps = 1e-6
 
