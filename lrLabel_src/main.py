@@ -7,9 +7,9 @@ import numpy as np
 import cv2
 import argparse
 from torch import optim
-from my_src.data import ImageDataset
-from my_src.energy import Energy
-from my_src.visualization import get_overlay_flow
+from lrLabel_src.data import ImageDataset
+from lrLabel_src.energy import Energy
+from lrLabel_src.visualization import get_overlay_flow
 # import warnings
 # warnings.filterwarnings("ignore", category=UserWarning, message=".*torch.meshgrid.*")
 

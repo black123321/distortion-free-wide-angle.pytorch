@@ -5,9 +5,9 @@ from align.alignment_utils import four_vertex_crop, get_human_mask, match_featur
 import torch
 
 np.set_printoptions(threshold=np.inf)
-from my_src.align.alignment import alignment
-from my_src.perception import get_label_masks
-from my_src.visualization import get_overlay_flow
+from lrLabel_src.align.alignment import alignment
+from lrLabel_src.perception import get_label_masks
+from lrLabel_src.visualization import get_overlay_flow
 
 
 def numpy_image_to_torch(image: np.ndarray) -> torch.Tensor:
