@@ -19,20 +19,19 @@ class ImageDataset():
         # self.data_list = sorted(self.data_list)
 
 
-    def get_image_by_file(self, file, resize=-1, classes=None, predictor=None):
-        data_name = file
+    def get_image_by_file(self, frame_bgr, resize=-1, classes=None, predictor=None):
         # try:
         #     fov = int(data_name.split('/')[-1].split('.')[0].split('_')[-1])
         # except ValueError:
         fov = 100
-        image = cv2.imread(data_name)
+        image = frame_bgr
         H, W, _ = image.shape
         if resize > 0:
             min_side = min(H, W)
             new_h = int(H / min_side * resize)
             new_w = int(W / min_side * resize)
             image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-        pad_size = 40
+        pad_size = 80
         image = np.pad(image, [[pad_size, pad_size], [pad_size, pad_size],[0, 0]], "constant", constant_values=0)
         H, W, _ = image.shape
         # image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
@@ -41,11 +40,11 @@ class ImageDataset():
         Wm = W // self.mesh_ds_ratio
 
         if classes is None:
-            seg_mask, box_masks = get_face_masks(image, predictor=predictor)
+            ori_seg_mask, box_masks = get_face_masks(image, predictor=predictor)
         else:
-            seg_mask, box_masks = get_object_masks(image, classes=classes, predictor=predictor)
+            ori_seg_mask, box_masks = get_object_masks(image, classes=classes, predictor=predictor)
 
-        seg_mask = cv2.resize(seg_mask.astype(np.float32), (Wm, Hm))
+        seg_mask = cv2.resize(ori_seg_mask.astype(np.float32), (Wm, Hm))
         box_masks = [cv2.resize(box_mask.astype(np.float32), (Wm, Hm)) for box_mask in box_masks]
         # print(box_masks)
         box_masks = np.stack(box_masks, axis=0)
@@ -58,7 +57,7 @@ class ImageDataset():
         rb = half_diagonal / (3 * np.log(99))
         correction_strength = 1 / (1 + np.exp(-(radial_distance_padded - ra) / rb))
 
-        return image, mesh_uniform_padded, mesh_stereo_padded, correction_strength, seg_mask_padded, box_masks_padded
+        return image, mesh_uniform_padded, mesh_stereo_padded, correction_strength, seg_mask_padded, box_masks_padded, ori_seg_mask
 
     def preprocess_image(self, file, resize=-1, classes=None, predictor=None):
         data_name = file

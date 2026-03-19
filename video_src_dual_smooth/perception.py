@@ -23,6 +23,52 @@ from detectron2.data import MetadataCatalog, DatasetCatalog
 import matplotlib.pyplot as plt
 
 
+def dilate_mask(mask, pixels=3):
+    """
+    mask: (H,W) 0/1 或 bool
+    pixels: 向外扩张的像素半径
+    """
+
+    mask = mask.astype(np.uint8)
+
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,   # ⭐ 推荐 ellipse
+        (2*pixels+1, 2*pixels+1)
+    )
+
+    dilated = cv2.dilate(mask, kernel)
+
+    return dilated
+
+
+def remove_small_regions(mask, min_area=100):
+    """
+    mask: (H,W) numpy, 0/1 或 bool
+    min_area: 小于该面积的区域删除
+
+    return:
+        cleaned_mask
+    """
+
+    # 确保是 uint8
+    mask = mask.astype(np.uint8)
+
+    # 连通域分析
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        mask,
+        connectivity=8
+    )
+
+    cleaned = np.zeros_like(mask)
+
+    for i in range(1, num_labels):  # 0 是背景
+        area = stats[i, cv2.CC_STAT_AREA]
+
+        if area >= min_area:
+            cleaned[labels == i] = 1
+
+    return cleaned
+
 def get_detectron_masks(image, predictor, classes=None, expansion=(1., 1.), debug=False):
 
     # run detectron
@@ -122,8 +168,10 @@ def get_face_masks(image,
     # dlib_detector = dlib.get_frontal_face_detector()  # 效果最好且快
     # dlib_detector = dlib.cnn_face_detection_model_v1(dat_path)  # 效果好但是超级慢 （阻塞后在C++层面在跑）
     box_masks, seg_masks = get_detectron_masks(image, predictor, classes=[0])  # 效果一般会有裂口 但是快
-
+    H, W = image.shape[:2]
     seg_mask = seg_masks.sum(axis=0) > 0
+    seg_mask = remove_small_regions(seg_mask, int(0.001 * H * W))
+    seg_mask = dilate_mask(seg_mask, pixels=int(0.005 * max(H, W)))
     # box_masks = get_dlib_masks(image, dlib_detector)
 
     return seg_mask, box_masks

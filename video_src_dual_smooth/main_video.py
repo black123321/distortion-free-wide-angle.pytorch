@@ -33,16 +33,9 @@ def get_mesh(last_mesh, frame_bgr, args, dataset, options, predictor):
        对单帧做一次畸变修复，返回修复后帧、光流可视化(可选)。
        为了兼容现有 ImageDataset.get_image_by_file，这里把帧写到临时文件再加载。
        """
-    ori_h, ori_w = frame_bgr.shape[:2]
-    # 暂存到临时文件（.png 无损，减少反复 jpeg 失真）
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
-        tmp_path = tf.name
-    cv2.imwrite(tmp_path, frame_bgr)
-
     # 走原有的数据准备流程
-    image, mesh_uniform_padded, mesh_stereo_padded, correction_strength, seg_mask_padded, box_masks_padded = dataset.get_image_by_file(
-        tmp_path, resize=args.resize, predictor=predictor)
-    H, W = image.shape[:2]
+    image, mesh_uniform_padded, mesh_stereo_padded, correction_strength, seg_mask_padded, box_masks_padded, _ = dataset.get_image_by_file(
+        frame_bgr, resize=args.resize, predictor=predictor)
     # 组装 energy 选项
     if args.naive:
         trivial_mask = np.ones_like(correction_strength)
@@ -83,7 +76,7 @@ def process_one_frame(image, mesh_optimal, resize):
         new_h = int(ori_h / min_side * resize)
         new_w = int(ori_w / min_side * resize)
         image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    pad_size = 40
+    pad_size = 80
     image = np.pad(image, [[pad_size, pad_size], [pad_size, pad_size], [0, 0]], "constant", constant_values=0)
     H, W, _ = image.shape
     # 计算光流并重采样
@@ -95,7 +88,7 @@ def process_one_frame(image, mesh_optimal, resize):
     y_map = (map_optimal[:, :, 1] + H // 2).astype(np.float32)
     out = cv2.remap(image, x_map, y_map, interpolation=cv2.INTER_LINEAR,
                     borderMode=cv2.BORDER_REFLECT101)
-    pad_size = 40
+    pad_size = 80
     out = out[pad_size:-pad_size, pad_size:-pad_size]
     out = cv2.resize(out, (ori_w, ori_h), interpolation=cv2.INTER_AREA)
 
@@ -205,16 +198,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Distortion-Free-Wide-Angle-Portraits-on-Camera-Phones')
     parser.add_argument('--num_iter', type=int, default=200, help="number of optimization steps") # 1k-200; 4k-300
     parser.add_argument('--lr', type=float, default=0.5, help="learning rate")
-    parser.add_argument('--Q', type=int, default=4, help="number of padding vertices")
-    parser.add_argument('--mesh_ds_ratio', type=int, default=40, help="the pixel-to-vertex ratio") # 1k-24; 4k-46
+    parser.add_argument('--Q', type=int, default=12, help="number of padding vertices")
+    parser.add_argument('--mesh_ds_ratio', type=int, default=46, help="the pixel-to-vertex ratio") # 1k-24; 4k-46
 
     parser.add_argument('--naive', type=int, default=0, help="if set True, perform naive orthographic correction")
     parser.add_argument('--face_energy', type=float, default=4, help="weight of the face energy term")
     parser.add_argument('--similarity', type=int, default=1, help="weight of similarity tranformation constraint")
-    parser.add_argument('--line_bending', type=float, default=4, help="weight of the line bending term")
+    parser.add_argument('--line_bending', type=float, default=10, help="weight of the line bending term")
     parser.add_argument('--regularization', type=float, default=0.5, help="weight of the regularization term")
     parser.add_argument('--boundary_constraint', type=float, default=4, help="weight of the mesh boundary constraint")
-    parser.add_argument('--time_energy', type=float, default=4, help="weight of the mesh boundary constraint")
+    parser.add_argument('--time_energy', type=float, default=25, help="weight of the mesh boundary constraint")
 
     # 新增视频参数
     parser.add_argument("--video", type=str, required=True, help="输入视频路径")
